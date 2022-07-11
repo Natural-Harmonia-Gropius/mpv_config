@@ -1,21 +1,19 @@
-# pylint: disable=C0114,C0116,E0401,E0602,W0212
-
 import vapoursynth as vs
 from vapoursynth import core
 
-CLIP            = video_in      # 原始帧（队列）
-W               = video_in_dw   # 原始帧宽度
-H               = video_in_dh   # 原始帧高度
-FPS             = container_fps # 原始帧率
-FREQ            = display_fps   # 屏幕刷新率
-VW              = 1920          # 目标缩放宽度
-VH              = 1080          # 目标缩放高度
-OFPS            = 59.94         # 目标帧率
-ADAPTIVE_OFPS   = True          # 自适应目标帧率，开启后输出帧率将被设置为：最小值(最大值(目标帧率, 双倍原始帧率, 半屏幕刷新率), 屏幕刷新率)"""
-USE_RIFE        = False         # 是否要使用RIFE预处理
-USE_MVTOOLS     = False         # 是否要使用MVTOOLS预处理
-USE_NVOF        = False         # 是否要使用NVOF预处理
-SP = """{ gpu: 1 }"""           # https://www.svp-team.com/wiki/Manual:SVPflow
+CLIP = video_in  # 原始帧（队列）
+W = video_in_dw  # 原始帧宽度
+H = video_in_dh  # 原始帧高度
+FPS = container_fps  # 原始帧率
+FREQ = display_fps  # 屏幕刷新率
+VW = 1920  # 目标缩放宽度
+VH = 1080  # 目标缩放高度
+OFPS = 59.940  # 目标帧率
+ADAPTIVE_OFPS = True  # 自适应目标帧率，开启后输出帧率将被设置为：最小值(最大值(目标帧率, 双倍原始帧率, 半屏幕刷新率), 屏幕刷新率)"""
+USE_RIFE = False  # 是否要使用RIFE预处理
+USE_MVTOOLS = False  # 是否要使用MVTOOLS预处理
+USE_NVOF = False  # 是否要使用NVOF预处理
+SP = """{ gpu: 1 }"""  # https://www.svp-team.com/wiki/Manual:SVPflow
 AP = """{
     block: { w: 32, h: 16, overlap: 2 },
     main: {
@@ -56,9 +54,9 @@ def main(
         clip, fps = svpflow_nvof(clip, fps)
 
     if ADAPTIVE_OFPS:
-        ofps = min(max(OFPS, FPS * 2, FREQ / 2), FREQ)
+        ofps = min(max(OFPS, fps * 2, FREQ / 2), FREQ)
 
-    clip, fps = svpflow(clip, fps, SP, AP, FP, round(ofps * 1000), 1000)
+    clip, fps = svpflow(clip, fps, SP, AP, FP, round(ofps) * 1000, 1001)
 
     return clip
 
@@ -102,30 +100,30 @@ def svpflow(
     fp_abs="auto",
     fp_gpuid=0,
 ):
-    quo = round(fp_num / fp_den, 3)
+    quo = fp_num / fp_den
 
     if fp_abs == "auto":
         if quo > fps:
             fp_abs = "true"
         else:
             fp_abs = "false"
-            quo = max(quo, 5)
 
     if fp_abs == "true":
         ofps = quo
     elif fp_abs == "false":
-        ofps = fps * quo
+        ofps = quo * fps
     else:
         raise Exception('typeof abs must be <"auto" | "true" | "false">')
 
     flow_param = flow_param % (fp_gpuid, fp_num, fp_den, fp_abs)
+
     clip, clip8 = to_yuv420(clip)
     svp_super = core.svp1.Super(clip8, super_param)
     svp_param = svp_super["clip"], svp_super["data"]
     svp_analyse = core.svp1.Analyse(*svp_param, clip, analyse_param)
     svp_param = *svp_param, svp_analyse["clip"], svp_analyse["data"]
     clip = core.svp2.SmoothFps(clip, *svp_param, flow_param, src=clip, fps=fps)
-    return clip, ofps
+    return clip, round(ofps, 3)
 
 
 def svpflow_nvof(clip, fps, super_param="{ gpu: 1 }"):
