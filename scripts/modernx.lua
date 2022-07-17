@@ -1,6 +1,6 @@
 -- mpv-osc-morden by maoiscat
 -- email:valarmor@163.com
--- https://github.com/maoiscat/mpv-osc-morden
+-- https://github.com/maoiscat/mpv-osc-modern
 
 -- fork by cyl0
 -- https://github.com/cyl0/MordenX
@@ -67,12 +67,14 @@ local user_opts = {
                                 -- playlist starts playing
     showonseek = false,         -- show OSC when seeking
     movesub = true,             -- move subtitles when the OSC is visible
+    volumebar = true,           -- show volume slider for ease of access
     titlefont = "",             -- font used for the title above OSC and
                                 -- in the window controls bar
     blur_intensity = 150,       -- adjust the strength of the OSC blur
     osc_color = "000000",       -- accent of the OSC and the title bar
     seekbarfg_color = "E39C42", -- color of the seekbar progress and handle
     seekbarbg_color = "FFFFFF", -- color of the remaining seekbar
+                                -- both options apply to the volumebar too
 }
 
 -- read options from config and command-line
@@ -1067,7 +1069,7 @@ function prepare_elements()
         end
 
         -- gray out the element if it is toggled off
-        if (element.off) then
+        if (element.inactive) then
             element.layout.alpha[1] = 136
         end
     end
@@ -1202,7 +1204,7 @@ function render_elements(master_ass)
             elem_ass:draw_stop()
 
             -- add tooltip
-            if not (element.slider.tooltipF == nil) then
+            if not (element.slider.tooltipF == nil) and element.enabled then
 
                 if mouse_hit(element) then
                     local sliderpos = get_slider_value(element)
@@ -1243,8 +1245,10 @@ function render_elements(master_ass)
                     ass_append_alpha(elem_ass, slider_lo.alpha, 0)
                     elem_ass:append(tooltiplabel)
 
-                    display_tn_osc(ty, sliderpos, elem_ass)
-                else
+                    if (element.thumbnailable) then
+                        display_tn_osc(ty, sliderpos, elem_ass)
+                    end
+                elseif (element.thumbnailable) then
                     hide_thumbnail()
                 end
             end
@@ -1458,6 +1462,7 @@ function new_element(name, type)
 
     if (type == "slider") then
         elements[name].slider = {min = {value = 0}, max = {value = 100}}
+        elements[name].thumbnailable = false
     end
 
     return elements[name]
@@ -1620,6 +1625,10 @@ function layout()
     local min = round(osc_param.display_aspect) <= 0.6
     local pad = min and -10 or 0
 
+    -- condition to determine whether volume bar is visible
+    -- if volume bar is hidden, reposition cy_audio and cy_sub
+    volbar_cond = user_opts.volumebar and round(osc_param.display_aspect) > 1.3
+
     osc_param.areas = {} -- delete areas
 
     -- area for active mouse input
@@ -1713,18 +1722,38 @@ function layout()
 
     if min then lo.geometry.x = osc_geo.w - 87 - pad end
 
+    -- Volumebar
+    lo = new_element("volumebarBg", "box")
+    lo.visible = volbar_cond
+
+    lo = add_layout("volumebarBg")
+    lo.geometry = {x = 67, y = refY - 40, an = 4, w = 80, h = 2}
+    lo.style = osc_styles.seekbarBg
+    lo.alpha[1] = 128
+    lo.layer = 13
+
+    lo = add_layout("volumebar")
+    lo.geometry = {x = 67, y = refY - 40, an = 4, w = 80, h = 8}
+    lo.style = (#tracks_osc.audio > 0) and osc_styles.seekbarFg
+               or osc_styles.seekbarBg
+    lo.slider.gap = 3
+    lo.slider.tooltip_style = osc_styles.tooltip
+    lo.slider.tooltip_an = 2
+
     -- Audio tracks
     lo = add_layout("cy_audio")
-    lo.geometry = {x = 87, y = refY - 40, an = 5, w = 24, h = 24}
+    lo.geometry = {x = 177, y = refY - 40, an = 5, w = 24, h = 24}
     lo.style = osc_styles.smallButtons
 
+    if not volbar_cond then lo.geometry.x = 87 end
     if min then lo.geometry.x = 37 end
 
     -- Subtitle tracks
     lo = add_layout("cy_sub")
-    lo.geometry = {x = 137, y = refY - 40, an = 5, w = 24, h = 24}
+    lo.geometry = {x = 217, y = refY - 40, an = 5, w = 24, h = 24}
     lo.style = osc_styles.smallButtons
 
+    if not volbar_cond then lo.geometry.x = 137 end
     if min then lo.geometry.x = 87 + pad end
 
     -- Cache
@@ -1959,13 +1988,13 @@ function osc_init()
     ne = new_element("cy_audio", "button")
 
     ne.enabled = (#tracks_osc.audio > 0)
-    ne.off = (get_track("audio") == 0)
+    ne.inactive = (get_track("audio") == 0)
     ne.content = osc_icons.audio
     ne.tooltip_style = osc_styles.tooltip
     ne.tooltipF = function ()
         local msg = "OFF"
         if not (get_track("audio") == 0) then
-            msg = "Audio ["..get_track("audio").."∕"..#tracks_osc.audio.."] "
+            msg = "Audio ["..get_track("audio").."/"..#tracks_osc.audio.."] "
             local lang = mp.get_property("current-tracks/audio/lang") or "N/A"
             local title = mp.get_property("current-tracks/audio/title") or ""
             msg = msg .. "(" .. lang .. ")" .. " " .. title
@@ -1984,13 +2013,13 @@ function osc_init()
     ne = new_element("cy_sub", "button")
 
     ne.enabled = (#tracks_osc.sub > 0)
-    ne.off = (get_track("sub") == 0)
+    ne.inactive = (get_track("sub") == 0)
     ne.content = osc_icons.subtitle
     ne.tooltip_style = osc_styles.tooltip
     ne.tooltipF = function ()
         local msg = "OFF"
         if not (get_track("sub") == 0) then
-            msg = "Subtitle ["..get_track("sub").."∕"..#tracks_osc.sub.."] "
+            msg = "Subtitle ["..get_track("sub").."/"..#tracks_osc.sub.."] "
             local lang = mp.get_property("current-tracks/sub/lang") or "N/A"
             local title = mp.get_property("current-tracks/sub/title") or ""
             msg = msg .. "(" .. lang .. ")" .. " " .. title
@@ -2030,6 +2059,7 @@ function osc_init()
     ne = new_element("seekbar", "slider")
 
     ne.enabled = not (mp.get_property("percent-pos") == nil)
+    ne.thumbnailable = true
     state.slider_element = ne.enabled and ne or nil  -- used for forced_title
     ne.slider.markerF = function ()
         local duration = mp.get_property_number("duration", nil)
@@ -2214,12 +2244,39 @@ function osc_init()
     end
     ne.eventresponder["mbtn_left_up"] =
         function () mp.commandv("cycle", "mute") end
-
     ne.eventresponder["wheel_up_press"] =
         function () mp.commandv("osd-auto", "add", "volume", 5) end
     ne.eventresponder["wheel_down_press"] =
         function () mp.commandv("osd-auto", "add", "volume", -5) end
 
+    -- volumebar
+    ne = new_element("volumebar", "slider")
+
+    ne.visible = user_opts.volumebar and round(osc_param.display_aspect) > 1.3
+    ne.enabled = (get_track("audio") > 0)
+    ne.slider.markerF = function () return {} end
+    ne.slider.seekRangesF = function () return nil end
+    ne.slider.posF =
+        function () return mp.get_property_number("volume", nil) end
+    ne.slider.tooltipF =
+        function (pos) return math.floor(pos) end
+    ne.eventresponder["mouse_move"] =
+        function (element)
+            -- see seekbar code for reference
+            local setvol = get_slider_value(element)
+            if (element.state.lastseek == nil) or
+                (not (element.state.lastseek == setvol)) then
+                    mp.commandv("set", "volume", setvol)
+                    element.state.lastseek = setvol
+            end
+        end
+    ne.eventresponder["mbtn_left_down"] =
+        function (element)
+            local setvol = get_slider_value(element)
+            mp.commandv("set", "volume", setvol)
+        end
+    ne.eventresponder["reset"] =
+        function (element) element.state.lastseek = nil end
 
     -- load layout
     layout()
