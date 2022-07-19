@@ -15,7 +15,7 @@ USE_NVOF = False  # 是否要使用NVOF预处理
 USE_MVTL = False  # 是否要使用MVTools预处理
 
 OFPS = 59.940  # 目标帧率
-ADAPTIVE_OFPS = True  # 自适应目标帧率，开启后输出帧率将被设置为：最小值(最大值(目标帧率, 双倍原始帧率, 半屏幕刷新率), 屏幕刷新率)"""
+ADAPTIVE_OFPS = True  # 自适应目标帧率，开启后输出帧率将被设置为：最小值(最大值(目标帧率, 双倍原始帧率, 半屏幕刷新率), 屏幕刷新率)
 
 SP = """{ gpu: 1 }"""  # https://www.svp-team.com/wiki/Manual:SVPflow
 AP = """{
