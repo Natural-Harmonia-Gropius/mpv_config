@@ -11,8 +11,8 @@ VW = 1920  # 目标缩放宽度
 VH = 1080  # 目标缩放高度
 
 USE_RIFE = False  # 是否要使用RIFE预处理
-USE_NVOF = False  # 是否要使用NVOF预处理
 USE_MVTL = False  # 是否要使用MVTools预处理
+USE_NVOF = False  # 是否要使用NVOF预处理
 
 OFPS = 59.940  # 目标帧率
 ADAPTIVE_OFPS = True  # 自适应目标帧率，开启后输出帧率将被设置为：最小值(最大值(目标帧率, 双倍原始帧率, 半屏幕刷新率), 屏幕刷新率)
@@ -51,11 +51,11 @@ def main(
     if USE_RIFE:
         clip, fps = rife(clip, fps)
 
-    if USE_NVOF:
-        clip, fps = svpflow_nvof(clip, fps)
-
     if USE_MVTL:
         clip, fps = mvtools(clip, fps)
+
+    if USE_NVOF:
+        clip, fps = svpflow_nvof(clip, fps)
 
     if ADAPTIVE_OFPS:
         ofps = min(max(OFPS, fps * 2, FREQ / 2), FREQ)
